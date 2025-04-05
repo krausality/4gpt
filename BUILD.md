@@ -13,7 +13,7 @@ Table of Contents
 Introduction
 
 This project handles the automation of multiple recurring tasks at the Datenstation. 
-The project is licensed under the Custom Personal Use License v1.4; see LICENSE file for more information.
+The project is licensed under the GNU GENERAL PUBLIC LICENSE Version 3; see LICENSE file for more information.
 Prerequisites
 
 Before building the project, ensure you have the following:

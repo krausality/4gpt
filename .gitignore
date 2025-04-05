@@ -10,6 +10,8 @@
 !BUILD.md
 !requirements.txt
 !example
+!LICENSE
+!pyproject.toml
 !/dist/*
 # etc...
 
