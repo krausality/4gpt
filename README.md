@@ -10,7 +10,24 @@ Die inkludierten und exkludierten Dateien lassen sich dynamisch oder permanent �
 - 🧠 Lokale und globale Konfigurationsverwaltung (`--global-config`)
 - ✅ Temporäre oder permanente Änderungen mit `--permanent`
 
+## ⚡ Quick Install (Recommended)
+
+Install directly from GitHub:
+
+```bash
+pip install "git+https://github.com/krausality/4gpt.git"
+```
+
+To install a specific version or for production builds, pin the commit:
+
+```bash
+pip install "git+https://github.com/krausality/4gpt.git@<commit-hash>"
+```
+
+Note: This method requires an internet connection and Git to be available in your environment.
+
 ## 🖥️ Installation
+
 
 ```bash
 git clone https://github.com/krausality/4gpt.git
