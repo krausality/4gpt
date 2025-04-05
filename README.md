@@ -60,5 +60,5 @@ Danach folgen alle Inhalte (nach Include/Exclude gefiltert) in `allfiles.txt`.
 
 ## 📝 Lizenz
 
-Dieses Projekt steht unter der MIT Lizenz. Siehe [LICENSE](LICENSE).
+Dieses Projekt steht unter der GNU GPL 3 Lizenz. Siehe [LICENSE](LICENSE).
 

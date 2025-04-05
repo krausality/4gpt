@@ -1,5 +1,8 @@
 from setuptools import setup, find_packages
 
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
+
 setup(
     name='4gpt',
     version='0.1',
@@ -19,7 +22,7 @@ setup(
     author='krausality',
     author_email='github@krausality.com',
     description='A CLI tool for generating an `allfiles.txt` report of a directory, with inclusion and exclusion rules managed through a `.gptignore` file and a centralized config.',
-    long_description=open('README.md').read(),
+    long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/krausality/4gpt',  # Update this if hosting the package
     classifiers=[
