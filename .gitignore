@@ -1,0 +1,17 @@
+# Ignore everything
+*
+
+# But not these files...
+!.gitignore
+!/forgpt/*
+!forgpt
+!setup.py
+!README.md
+!BUILD.md
+!requirements.txt
+!example
+!/dist/*
+# etc...
+
+# ...even if they are in subdirectories
+!*/

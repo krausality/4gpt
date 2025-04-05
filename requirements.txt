@@ -1,0 +1,7 @@
+# Standard build & packaging tools
+build
+setuptools
+wheel
+
+# External dependency (your own)
+git+https://github.com/krausality/dir_tree.git
