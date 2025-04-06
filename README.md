@@ -52,6 +52,35 @@ pip install dist/4gpt-*.whl
 4gpt list-excludes --global-config  # Shows global excludes
 ```
 
+## 🕵️ Dry Run Mode
+
+Use `--dry-run` to preview which files would be included or excluded **without writing anything to `allfiles.txt`** or modifying any config files.
+
+This is useful to test inclusion/exclusion patterns before running the actual collection.
+
+```bash
+4gpt --dry-run
+```
+
+Example output:
+
+```bash
+--- Dry Run Mode ---
+Include patterns: {'*.py', '*.md'}
+Exclude patterns: {'*.png', '*.svg', 'allfiles.txt', '.gptignore'}
+
+✅ ./main.py
+✅ ./utils/helper.py
+❌ ./logo.png
+❌ ./dist/bundle.zip
+```
+
+You can combine this with `--global-config` to simulate the global configuration as well:
+
+```bash
+4gpt --dry-run --global-config
+```
+
 ## ⚙️ Configuration Logic
 
 | Mode                                | Configuration Source                          |
@@ -77,4 +106,3 @@ After that, all contents (filtered by include/exclude rules) are appended to `al
 ## 📄 License
 
 This project is licensed under the GNU GPL 3 License. See [LICENSE](LICENSE).
-
