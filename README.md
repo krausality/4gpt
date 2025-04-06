@@ -1,14 +1,14 @@
 # 4gpt
 
-`4gpt` ist ein CLI-Tool zur automatisierten Sammlung und Analyse von Dateien innerhalb eines Projekts.  
-Die inkludierten und exkludierten Dateien lassen sich dynamisch oder permanent über `.gptignore` und/oder eine zentrale `config.json` steuern.
+`4gpt` is a CLI tool for automated collection and analysis of files within a project.  
+Included and excluded files can be controlled dynamically or permanently via `.gptignore` and/or a central `config.json`.
 
 ## 🔧 Features
 
-- 📁 Generierung einer Dateistrukturübersicht als Baum + JSON
-- 🔍 Einschluss/ Ausschluss nach Muster (z. B. `*.py`, `*.png`)
-- 🧠 Lokale und globale Konfigurationsverwaltung (`--global-config`)
-- ✅ Temporäre oder permanente Änderungen mit `--permanent`
+- 🗂️ Generates a file structure overview as a tree + JSON
+- 📂 Inclusion/exclusion via patterns (e.g. `*.py`, `*.png`)
+- 🧠 Local and global configuration management (`--global-config`)
+- ✅ Temporary or permanent changes with `--permanent`
 
 ## ⚡ Quick Install (Recommended)
 
@@ -24,10 +24,9 @@ To install a specific version or for production builds, pin the commit:
 pip install "git+https://github.com/krausality/4gpt.git@<commit-hash>"
 ```
 
-Note: This method requires an internet connection and Git to be available in your environment.
+**Note**: This method requires an internet connection and Git to be available in your environment.
 
 ## 🖥️ Installation
-
 
 ```bash
 git clone https://github.com/krausality/4gpt.git
@@ -36,7 +35,7 @@ pip install -r requirements.txt
 pip install .
 ```
 
-Alternativ als Wheel:
+Alternatively, as a wheel:
 
 ```bash
 python -m build --wheel
@@ -46,23 +45,23 @@ pip install dist/4gpt-*.whl
 ## 🚀 Usage
 
 ```bash
-4gpt                          # Führt Analyse mit der aktuellen Konfiguration aus
-4gpt include "*.ts"          # Temporär .ts-Dateien einbeziehen
-4gpt exclude "*.png" --permanent   # Permanent PNG-Dateien ausschließen
-4gpt list-includes           # Zeigt aktuelle Include-Muster
-4gpt list-excludes --global-config  # Zeigt globale Excludes
+4gpt                                # Runs analysis with current configuration
+4gpt include "*.ts"                # Temporarily include .ts files
+4gpt exclude "*.png" --permanent  # Permanently exclude PNG files
+4gpt list-includes                 # Shows current include patterns
+4gpt list-excludes --global-config  # Shows global excludes
 ```
 
-## ⚙️ Konfigurationslogik
+## ⚙️ Configuration Logic
 
-| Modus                                | Konfigurationsquelle        |
-|-------------------------------------|-----------------------------|
-| `4gpt`                               | Lokale `.gptignore` oder globale `config.json` |
-| `--global-config`                    | Ignoriert lokale Konfig, nutzt `config.json`   |
-| `--permanent` ohne `--global-config`| Lokale `.gptignore` wird erstellt/angepasst    |
-| `--permanent --global-config`       | Globale Konfig wird dauerhaft angepasst        |
+| Mode                                | Configuration Source                          |
+|-------------------------------------|-----------------------------------------------|
+| `4gpt`                              | Local `.gptignore` or global `config.json`    |
+| `--global-config`                   | Ignores local config, uses `config.json`      |
+| `--permanent` without `--global-config` | Creates/modifies local `.gptignore`      |
+| `--permanent --global-config`       | Modifies the global configuration permanently |
 
-## 📂 Beispiel-Ausgabe
+## 📂 Example Output
 
 ```txt
 File Structure:
@@ -73,9 +72,9 @@ project
 │   └── helper.py
 ```
 
-Danach folgen alle Inhalte (nach Include/Exclude gefiltert) in `allfiles.txt`.
+After that, all contents (filtered by include/exclude rules) are appended to `allfiles.txt`.
 
-## 📝 Lizenz
+## 📄 License
 
-Dieses Projekt steht unter der GNU GPL 3 Lizenz. Siehe [LICENSE](LICENSE).
+This project is licensed under the GNU GPL 3 License. See [LICENSE](LICENSE).
 

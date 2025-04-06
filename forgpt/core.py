@@ -226,11 +226,36 @@ class FileCollector:
         self.generate_tree()
         self.collect_files()
 
+    def dry_run(self):
+        """Dry-run mode to preview which files would be included or excluded."""
+        include_patterns = self._compile_patterns(list(self.include_patterns))
+        exclude_patterns = self._compile_patterns(list(self.exclude_patterns))
+
+        print("\n--- Dry Run Mode ---")
+        print(f"Include patterns: {self.include_patterns}")
+        print(f"Exclude patterns: {self.exclude_patterns}")
+        print("Scanning files...\n")
+
+        for root, dirs, files in os.walk(self.root_dir):
+            dirs[:] = [d for d in dirs if d not in self.exclude_patterns and not any(fnmatch.fnmatch(d, pattern) for pattern in self.exclude_patterns)]
+            for file in files:
+                file_path = os.path.join(root, file)
+                included = any(re.match(p, file) for p in include_patterns)
+                excluded = any(re.match(p, file) for p in exclude_patterns)
+                if included and not excluded:
+                    print(f"✅ {file_path}")
+                else:
+                    print(f"❌ {file_path}")
+
+
 
 def main():
     parser = argparse.ArgumentParser(description="FileCollector CLI to manage file inclusion and exclusion.")
     subparsers = parser.add_subparsers(dest="command", help="Sub-command help")
    
+    # Add global option
+    parser.add_argument('--dry-run', action='store_true', help='Show which files would be included or excluded without writing output.')
+
     # Add global config option
     parser.add_argument('--global-config', action='store_true', help='Apply changes to the global config instead of the local config.')
 
@@ -284,10 +309,13 @@ def main():
         # If no command is provided, just run the collector
         pass
 
-    collector.run()
-    collector.reload_settings_from_permanent_config()
-
-    
+    # Run with dry-run logic
+    if args.dry_run:
+        collector.dry_run()
+    else:
+        collector.run()
+        collector.reload_settings_from_permanent_config()
+        
 if __name__ == "__main__":
     main()
 

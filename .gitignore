@@ -5,6 +5,7 @@
 !.gitignore
 !/forgpt/*
 !forgpt
+!.gptignore
 !setup.py
 !README.md
 !BUILD.md

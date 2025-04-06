@@ -27,7 +27,7 @@ setup(
     url='https://github.com/krausality/4gpt',  # Update this if hosting the package
     classifiers=[
         'Programming Language :: Python :: 3',
-        'License :: OSI Approved :: MIT License',
+        'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Operating System :: OS Independent',
         'Topic :: Utilities',
         'Intended Audience :: Developers',
