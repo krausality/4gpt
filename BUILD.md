@@ -12,7 +12,6 @@ Table of Contents
     - Technique 2 (Offline): `python setup.py bdist_wheel`
 Introduction
 
-This project handles the automation of multiple recurring tasks at the Datenstation. 
 The project is licensed under the GNU GENERAL PUBLIC LICENSE Version 3; see LICENSE file for more information.
 Prerequisites
 
