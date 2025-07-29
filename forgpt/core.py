@@ -4,142 +4,155 @@ import os
 import fnmatch
 import re
 from dir_tree import DirectoryTree
-import shutil  # For copying the global config
+import shutil
+import sys
+import subprocess # NEU
+import platform   # NEU
+
+# NEUE FUNKTION
+def copy_to_clipboard(text: str):
+    """Copies the given text to the system clipboard."""
+    system = platform.system()
+    try:
+        if system == "Windows":
+            process = subprocess.Popen(['clip.exe'], stdin=subprocess.PIPE, close_fds=True)
+            process.communicate(input=text.encode('utf-8')) # oder 'mbcs'
+            print("Content copied to clipboard (Windows).")
+        elif system == "Darwin": # macOS
+            process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
+            process.communicate(input=text.encode('utf-8'))
+            print("Content copied to clipboard (macOS).")
+        elif system == "Linux":
+            try:
+                process = subprocess.Popen(['xclip', '-selection', 'clipboard'], stdin=subprocess.PIPE)
+                process.communicate(input=text.encode('utf-8'))
+                print("Content copied to clipboard (Linux with xclip).")
+            except FileNotFoundError:
+                try:
+                    process = subprocess.Popen(['xsel', '--clipboard', '--input'], stdin=subprocess.PIPE)
+                    process.communicate(input=text.encode('utf-8'))
+                    print("Content copied to clipboard (Linux with xsel).")
+                except FileNotFoundError:
+                    print("Clipboard tool (xclip or xsel) not found on Linux. Please install one to use this feature.")
+        else:
+            print(f"Clipboard operations not supported on this platform: {system}")
+    except Exception as e:
+        print(f"Error copying to clipboard: {e}")
+
 
 class FileCollector:
-    def __init__(self, root_dir='.', use_global_config=False, permanent=False):
-        """
-        Initialize the FileCollector with a given root directory.
-        If use_global_config is True, work with the global config file. Otherwise, use the local config if it exists.
-        If the local config doesn't exist and permanent changes are requested, create it.
-        """
+    # ... (Die gesamte FileCollector Klasse bleibt exakt so, wie sie in deinem letzten Post war) ...
+    # (also init, reload_settings, load_global, load_local, save_local, save_global,
+    # add_include, remove_include, add_exclude, remove_exclude, list_includes, list_excludes,
+    # generate_tree, collect_files, _compile_patterns, _append_file_content, run, dry_run)
+    # Diese Methoden müssen nicht geändert werden.
+    def __init__(self, root_dir='.', use_global_config=False, permanent=False, follow_symlinks=False):
         self.root_dir = root_dir
         self.use_global_config = use_global_config
-        self.permanent = permanent  # Whether a permanent change is being made
+        self.permanent = permanent # Relevant für das Erstellen einer lokalen .gptignore
+        self.follow_symlinks = follow_symlinks
 
-        """
-        If ""2gpt ... " and no local config not exits 
-        """
-        if ((not self.use_global_config) and (not self.local_config_exists())):
-            if self.permanent:
-                self.config = self.load_local_config() #creating and loading local config
-            else:
-                self.config = self.load_global_config() #loading global config
-
-
-        #If 2gpt ...  and local config exits 
-        elif ((not self.use_global_config) and self.local_config_exists()):
-            if self.permanent:
-                self.config = self.load_local_config() #creating and loading local config
-            else:
-                self.config = self.load_local_config() #loading global config
-
-        #2gpt ... --global-config
-        elif self.use_global_config:
-            if self.permanent:
-                self.config = self.load_local_config() #creating and loading local config
-            else:
-                self.config = self.load_global_config() #loading global config
-
-        else:
-            pass
-
-
-        # trashs the unpermanent includes/excludes by restoring the includes/excludes
-        # from the permanent config. Should be used after each run.
-        # if the FileCollector Object is continously used.
+        if self.use_global_config:
+            self.config = self.load_global_config()
+        elif self.local_config_exists():
+            self.config = self.load_local_config()
+        elif self.permanent: 
+            self.config = self.load_local_config() 
+        else: 
+            self.config = self.load_global_config()
+        
         self.reload_settings_from_permanent_config()
 
     def reload_settings_from_permanent_config(self):
-        # Settings from the configuration file
         self.output_file = self.config.get("output_file", "allfiles.txt")
         self.ignore_file = self.config.get("ignore_file", ".gptignore")
         self.include_patterns = set(self.config.get("include_patterns", []))
         self.exclude_patterns = set(self.config.get("exclude_patterns", []))
-
-        # Exclude specific files (self-exclusion)
         self.exclude_patterns.add(self.output_file)
-        self.exclude_patterns.add(self.ignore_file)
+        self.exclude_patterns.add(self.ignore_file) 
+
 
     def local_config_exists(self):
-        """Check if the local .gptignore config exists."""
         local_config_path = os.path.join(self.root_dir, '.gptignore')
         return os.path.exists(local_config_path)
 
     def load_global_config(self):
-        """Load the global configuration from the package's config.json file."""
         config_path = os.path.join(os.path.dirname(__file__), 'config.json')
         if not os.path.exists(config_path):
-            print(f"Global configuration file not found at {config_path}, using default settings.")
-            return {}
+            return {"output_file": "allfiles.txt", "ignore_file": ".gptignore", "include_patterns": [], "exclude_patterns": []}
         with open(config_path, 'r') as config_file:
             return json.load(config_file)
 
     def load_local_config(self):
-        """Load the local .gptignore configuration or create it from the global config if not present."""
         local_config_path = os.path.join(self.root_dir, '.gptignore')
-        global_config_path = os.path.join(os.path.dirname(__file__), 'config.json')
-
+        
         if os.path.exists(local_config_path):
-            # Load existing local config
             with open(local_config_path, 'r') as config_file:
-                return json.load(config_file)
-        elif self.permanent:
-            # If no local config exists and a permanent change is being made, copy from the global config
-            print(f"Local .gptignore not found. Creating from global config for permanent changes.")
-            shutil.copy(global_config_path, local_config_path)
+                try:
+                    return json.load(config_file)
+                except json.JSONDecodeError:
+                    return self.load_global_config()
+        elif self.permanent: 
+            global_config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+            if not os.path.exists(global_config_path):
+                default_conf = {"output_file": "allfiles.txt", "ignore_file": ".gptignore", "include_patterns": [], "exclude_patterns": []}
+                with open(local_config_path, 'w') as f:
+                    json.dump(default_conf, f, indent=4)
+                return default_conf
+            try:
+                shutil.copy(global_config_path, local_config_path)
+                with open(local_config_path, 'r') as copied_file: 
+                    return json.load(copied_file)
+            except Exception as e:
+                return self.load_global_config() 
+        else: 
             return self.load_global_config()
-        else:
-            # Use global config temporarily if no local config exists and no permanent changes are requested
-            return self.load_global_config()
+
+    def _ensure_config_keys_exist(self):
+        if 'include_patterns' not in self.config: self.config['include_patterns'] = []
+        if 'exclude_patterns' not in self.config: self.config['exclude_patterns'] = []
+        if 'output_file' not in self.config: self.config['output_file'] = "allfiles.txt"
+        if 'ignore_file' not in self.config: self.config['ignore_file'] = ".gptignore"
 
     def save_local_config(self):
-        """Save the local .gptignore configuration."""
+        self._ensure_config_keys_exist()
         local_config_path = os.path.join(self.root_dir, '.gptignore')
         with open(local_config_path, 'w') as f:
             json.dump(self.config, f, indent=4)
-        print(f"Local configuration saved to {local_config_path}.")
 
     def save_global_config(self):
-        """Save the global configuration to config.json."""
+        self._ensure_config_keys_exist()
         config_path = os.path.join(os.path.dirname(__file__), 'config.json')
         with open(config_path, 'w') as config_file:
             json.dump(self.config, config_file, indent=4)
-        print(f"Global configuration saved to {config_path}.")
 
-    def add_include(self, pattern, permanent=False):     
-        """Add a file pattern to the include list."""
-        if pattern not in self.include_patterns:
-            self.include_patterns.add(pattern)
-
+    def add_include(self, pattern, permanent=False):
+        self.include_patterns.add(pattern)
         if permanent:
+            self._ensure_config_keys_exist()
             if pattern not in self.config['include_patterns']:
                 self.config['include_patterns'].append(pattern)
-
             if self.use_global_config:
                 self.save_global_config()
             else:
                 self.save_local_config()
 
-
     def remove_include(self, pattern, permanent=False):
-        """Remove a file pattern from the include list."""
         if pattern in self.include_patterns:
             self.include_patterns.remove(pattern)
         if permanent:
+            self._ensure_config_keys_exist()
             if pattern in self.config['include_patterns']:
                 self.config['include_patterns'].remove(pattern)
-            
             if self.use_global_config:
                 self.save_global_config()
             else:
                 self.save_local_config()
 
     def add_exclude(self, pattern, permanent=False):
-        """Add a file pattern to the exclude list."""
-        if pattern not in self.exclude_patterns:
-            self.exclude_patterns.add(pattern)
+        self.exclude_patterns.add(pattern)
         if permanent:
+            self._ensure_config_keys_exist()
             if pattern not in self.config['exclude_patterns']:
                 self.config['exclude_patterns'].append(pattern)
             if self.use_global_config:
@@ -147,403 +160,285 @@ class FileCollector:
             else:
                 self.save_local_config()
 
-
-
     def remove_exclude(self, pattern, permanent=False):
-        """Remove a file pattern from the exclude list."""
         if pattern in self.exclude_patterns:
             self.exclude_patterns.remove(pattern)
         if permanent:
+            self._ensure_config_keys_exist()
             if pattern in self.config['exclude_patterns']:
                 self.config['exclude_patterns'].remove(pattern)
-
             if self.use_global_config:
                 self.save_global_config()
             else:
                 self.save_local_config()
 
     def list_includes(self):
-        """List all the include file patterns."""
-        print("Currently included files:")
-        for pattern in self.include_patterns:
+        print("Currently included file patterns (from effective config):")
+        for pattern in sorted(list(self.include_patterns)):
             print(f"  {pattern}")
 
     def list_excludes(self):
-        """List all the exclude file patterns."""
-        print("Currently excluded files:")
-        for pattern in self.exclude_patterns:
+        print("Currently excluded file patterns (from effective config):")
+        for pattern in sorted(list(self.exclude_patterns)):
             print(f"  {pattern}")
 
-
     def generate_tree(self):
-        """Generate the directory tree and write it to the output file."""
-        tree = DirectoryTree(root_dir=self.root_dir, exclude_dirs=[], exclude_files=self.exclude_patterns) #exclude_files works also with directorys
-        with open(self.output_file, 'w', encoding='utf-8') as f:
-            f.write("File Structure:\n")
-            f.write(json.loads(tree.to_json())["tree_print"])
-            f.write("\n\n")
+        tree = DirectoryTree(
+            root_dir=self.root_dir,
+            exclude_dirs=set(), 
+            exclude_files=self.exclude_patterns, 
+            follow_symlinks_in_tree=self.follow_symlinks
+        )
+        try:
+            with open(self.output_file, 'w', encoding='utf-8') as f:
+                f.write("File Structure:\n")
+                tree_json_str = tree.to_json()
+                tree_data = json.loads(tree_json_str)
+                f.write(tree_data["tree_print"])
+                f.write("\n\n")
+        except IOError as e:
+            print(f"Error writing to output file {self.output_file}: {e}")
+            return
 
     def collect_files(self):
-        """Collect files based on inclusion and exclusion patterns."""
-        include_patterns = self._compile_patterns(list(self.include_patterns))
-        exclude_patterns = self._compile_patterns(list(self.exclude_patterns))
-        print(f"Include patterns: {include_patterns}")  # Debugging line
-        print(f"Exclude patterns: {exclude_patterns}")  # Debugging line
-
-        with open(self.output_file, 'a') as f:
-            for root, dirs, files in os.walk(self.root_dir):
-                print(f"Walking directory: {root}")  # Debugging line
-                dirs[:] = [d for d in dirs if d not in self.exclude_patterns and not any(fnmatch.fnmatch(d, pattern) for pattern in self.exclude_patterns)]
-                for file in files:
-                    print(f"Processing file: {file}")  # Debugging line
-                    if any(re.match(pattern, file) for pattern in include_patterns) and not any(re.match(pattern, file) for pattern in exclude_patterns):
-                        file_path = os.path.join(root, file)
-                        print(f"Including file for content collection: {file_path}")
-                        self._append_file_content(f, file_path)
+        compiled_include_patterns = self._compile_patterns(list(self.include_patterns))
+        compiled_exclude_patterns = self._compile_patterns(list(self.exclude_patterns))
+        
+        try:
+            with open(self.output_file, 'a', encoding='utf-8') as f_out:
+                for root, dirs, files in os.walk(self.root_dir, followlinks=self.follow_symlinks):
+                    dirs[:] = [
+                        d for d in dirs 
+                        if not any(fnmatch.fnmatch(d, pattern) for pattern in self.exclude_patterns)
+                    ]
+                    
+                    for file_name in files:
+                        included = any(re.fullmatch(pattern_re, file_name) for pattern_re in compiled_include_patterns)
+                        excluded = any(re.fullmatch(pattern_re, file_name) for pattern_re in compiled_exclude_patterns)
+                        
+                        if included and not excluded:
+                            file_path = os.path.join(root, file_name)
+                            self._append_file_content(f_out, file_path)
+        except IOError as e:
+            print(f"Error appending to output file {self.output_file}: {e}")
 
     def _compile_patterns(self, patterns):
-        """Compile wildcard patterns into regular expressions."""
-        return [fnmatch.translate(pattern) for pattern in patterns]
+        compiled = []
+        if not patterns: return compiled
+        for p in patterns:
+            if p == "*":
+                compiled.append(r"^.*$") 
+            elif p == "*.*":
+                 compiled.append(r"^.*\..*$") 
+            else:
+                translated = fnmatch.translate(p)
+                if translated.startswith("(?s:") and translated.endswith("\\Z"):
+                    regex_body = translated[4:-3] 
+                elif translated.endswith("\\Z"):
+                    regex_body = translated[:-2]
+                else: 
+                    regex_body = translated
+                compiled.append(f"^{regex_body}$")
+        return compiled
 
-    def _append_file_content(self, file, file_path):
-        """Append file content to the output."""
-        print(f"Attempting to append content from: {file_path}")  # Debugging line
+    def _append_file_content(self, output_file_obj, file_path):
         try:
-            with open(file_path, 'r', errors='ignore') as f:
-                content = f.read()
-                if not content:
-                    print(f"File {file_path} is empty or unreadable.")
-                else:
-                    print(f"Read content from {file_path}: {content[:100]}")  # First 100 chars of content
-                    file.write(f"----- START OF {file_path} -----\n")
-                    file.write(content)
-                    file.write(f"\n----- END OF {file_path} -----\n\n\n")
+            if os.path.isdir(file_path): 
+                return
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f_content:
+                content = f_content.read()
+            output_file_obj.write(f"----- START OF {os.path.normpath(file_path)} -----\n")
+            output_file_obj.write(content)
+            output_file_obj.write(f"\n----- END OF {os.path.normpath(file_path)} -----\n\n\n")
         except Exception as e:
-            print(f"Error appending content from {file_path}: {e}")
+            pass 
 
     def run(self):
-        """Run the file collection process."""
         self.generate_tree()
         self.collect_files()
 
     def dry_run(self):
-        """Dry-run mode to preview which files would be included or excluded."""
-        include_patterns = self._compile_patterns(list(self.include_patterns))
-        exclude_patterns = self._compile_patterns(list(self.exclude_patterns))
+        compiled_include_patterns = self._compile_patterns(list(self.include_patterns))
+        compiled_exclude_patterns = self._compile_patterns(list(self.exclude_patterns))
 
         print("\n--- Dry Run Mode ---")
-        print(f"Include patterns: {self.include_patterns}")
-        print(f"Exclude patterns: {self.exclude_patterns}")
+        print(f"Root directory: {os.path.abspath(self.root_dir)}")
+        print(f"Following symlinks: {self.follow_symlinks}")
+        print(f"Include patterns (runtime): {sorted(list(self.include_patterns))}")
+        print(f"Exclude patterns (runtime): {sorted(list(self.exclude_patterns))}")
         print("Scanning files...\n")
 
-        for root, dirs, files in os.walk(self.root_dir):
-            dirs[:] = [d for d in dirs if d not in self.exclude_patterns and not any(fnmatch.fnmatch(d, pattern) for pattern in self.exclude_patterns)]
-            for file in files:
-                file_path = os.path.join(root, file)
-                included = any(re.match(p, file) for p in include_patterns)
-                excluded = any(re.match(p, file) for p in exclude_patterns)
-                if included and not excluded:
-                    print(f"✅ {file_path}")
-                else:
-                    print(f"❌ {file_path}")
+        for root, dirs, files in os.walk(self.root_dir, followlinks=self.follow_symlinks):
+            dirs[:] = [
+                d for d in dirs 
+                if not any(fnmatch.fnmatch(d, pattern) for pattern in self.exclude_patterns)
+            ]
 
+            for file_name in files:
+                file_path = os.path.join(root, file_name)
+                
+                included = any(re.fullmatch(p_re, file_name) for p_re in compiled_include_patterns)
+                excluded = any(re.fullmatch(p_re, file_name) for p_re in compiled_exclude_patterns)
+                
+                if included and not excluded:
+                    print(f"✅ {os.path.normpath(file_path)}")
+                else:
+                    reason = ""
+                    if not included: reason += " (no include match)"
+                    if excluded: reason += f" (exclude match)" 
+                    print(f"❌ {os.path.normpath(file_path)}{reason}")
+        print("\n--- End of Dry Run ---")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="FileCollector CLI to manage file inclusion and exclusion.")
-    subparsers = parser.add_subparsers(dest="command", help="Sub-command help")
-   
-    # Add global option
-    parser.add_argument('--dry-run', action='store_true', help='Show which files would be included or excluded without writing output.')
+    parser = argparse.ArgumentParser(
+        description="FileCollector CLI to manage file inclusion and exclusion.",
+        epilog="""
+Examples:
+  4gpt                                # Run with current config.
+  4gpt -c                             # Run and copy output to clipboard.
+  4gpt --follow-symlinks -c           # Run, follow symlinks, and copy to clipboard.
+  4gpt include "*.py" --permanent     # Permanently include Python files in local config.
+  4gpt list-excludes --global-config  # List excludes from global config.
+  4gpt --dry-run --follow-symlinks    # Dry run, following directory symlinks.
+""",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
 
-    # Add global config option
-    parser.add_argument('--global-config', action='store_true', help='Apply changes to the global config instead of the local config.')
+    # Globale Optionen
+    parser.add_argument('--dry-run', action='store_true',
+                        help='Show which files would be included or excluded without writing output.')
+    parser.add_argument('--global-config', action='store_true',
+                        help='Use global config. If combined with --permanent, modifies global config.')
+    parser.add_argument('--follow-symlinks', action='store_true',
+                        help='Follow symbolic links to directories when collecting files and generating tree structure.')
+    parser.add_argument('--to-clipboard', '-c', action='store_true',  # NEUER PARAMETER
+                        help='Copy the content of the generated output file to the clipboard after a successful run.')
 
-    # Add subcommand for including files
-    include_parser = subparsers.add_parser("include", help="Add a file or directory to the include list.")
+    subparsers = parser.add_subparsers(dest="command", title="Commands",
+                                       description="Available commands:",
+                                       help="Action to perform. If no command is given, a run is performed.")
+
+    # Subkommandos (bleiben gleich)
+    include_parser = subparsers.add_parser("include", help="Add a file pattern to the include list.")
     include_parser.add_argument("pattern", help="Pattern to include (e.g., '*.py').")
-    include_parser.add_argument("--permanent", action="store_true", help="Make the inclusion permanent.")
+    include_parser.add_argument("--permanent", action="store_true", help="Make the inclusion permanent in the selected config.")
 
-    # Add subcommand for excluding files
-    exclude_parser = subparsers.add_parser("exclude", help="Add a file or directory to the exclude list.")
+    exclude_parser = subparsers.add_parser("exclude", help="Add a file pattern to the exclude list.")
     exclude_parser.add_argument("pattern", help="Pattern to exclude (e.g., '*.png').")
-    exclude_parser.add_argument("--permanent", action="store_true", help="Make the exclusion permanent.")
+    exclude_parser.add_argument("--permanent", action="store_true", help="Make the exclusion permanent in the selected config.")
 
-    # Add subcommand for removing from include list
-    remove_include_parser = subparsers.add_parser("remove-include", help="Remove a file from the include list.")
+    remove_include_parser = subparsers.add_parser("remove-include", help="Remove a file pattern from the include list.")
     remove_include_parser.add_argument("pattern", help="Pattern to remove from include list.")
-    remove_include_parser.add_argument("--permanent", action="store_true", help="Remove permanently from config.")
+    remove_include_parser.add_argument("--permanent", action="store_true", help="Remove permanently from the selected config.")
 
-    # Add subcommand for removing from exclude list
-    remove_exclude_parser = subparsers.add_parser("remove-exclude", help="Remove a file from the exclude list.")
+    remove_exclude_parser = subparsers.add_parser("remove-exclude", help="Remove a file pattern from the exclude list.")
     remove_exclude_parser.add_argument("pattern", help="Pattern to remove from exclude list.")
-    remove_exclude_parser.add_argument("--permanent", action="store_true", help="Remove permanently from config.")
+    remove_exclude_parser.add_argument("--permanent", action="store_true", help="Remove permanently from the selected config.")
 
-    # Add subcommand for listing includes and excludes
-    subparsers.add_parser("list-includes", help="List all permanently included files.")
-    subparsers.add_parser("list-excludes", help="List all permanently excluded files.")
+    subparsers.add_parser("list-includes", help="List current include patterns based on effective config.")
+    subparsers.add_parser("list-excludes", help="List current exclude patterns based on effective config.")
+
 
     args = parser.parse_args()
 
-    # Determine whether we're using the global config
-    global_config = args.global_config if hasattr(args, 'global_config') else False
-    permanent = args.permanent if hasattr(args, 'permanent') else False
+    use_global_conf_cli = args.global_config
+    collector_init_permanent_flag = False
+    if args.command in ["include", "exclude", "remove-include", "remove-exclude"] and \
+       args.permanent and not use_global_conf_cli:
+        collector_init_permanent_flag = True
+    
+    collector = FileCollector(
+        root_dir=".", 
+        use_global_config=use_global_conf_cli, 
+        permanent=collector_init_permanent_flag,
+        follow_symlinks=args.follow_symlinks
+    )
 
-    # Initialize the collector
-    collector = FileCollector(root_dir=".", use_global_config=global_config, permanent=permanent)
+    action_is_permanent = args.permanent if hasattr(args, 'permanent') and args.permanent else False
+    command_executed = True 
 
-    if args.command in ["include", "exclude", "remove-include", "remove-exclude"]:
-        if args.command == "include":
-            collector.add_include(args.pattern, permanent=permanent)
-        elif args.command == "exclude":
-            collector.add_exclude(args.pattern, permanent=permanent)
-        elif args.command == "remove-include":
-            collector.remove_include(args.pattern, permanent=permanent)
-        elif args.command == "remove-exclude":
-            collector.remove_exclude(args.pattern, permanent=permanent)
+    if args.command == "include":
+        collector.add_include(args.pattern, permanent=action_is_permanent)
+        print(f"Pattern '{args.pattern}' added to include list {'permanently.' if action_is_permanent else 'for this session.'}")
+    elif args.command == "exclude":
+        collector.add_exclude(args.pattern, permanent=action_is_permanent)
+        print(f"Pattern '{args.pattern}' added to exclude list {'permanently.' if action_is_permanent else 'for this session.'}")
+        if not action_is_permanent:  # If temporary, run immediately
+            collector.run()
+    elif args.command == "remove-include":
+        collector.remove_include(args.pattern, permanent=action_is_permanent)
+        print(f"Pattern '{args.pattern}' removed from include list {'permanently.' if action_is_permanent else 'for this session.'}")
+    elif args.command == "remove-exclude":
+        collector.remove_exclude(args.pattern, permanent=action_is_permanent)
+        print(f"Pattern '{args.pattern}' removed from exclude list {'permanently.' if action_is_permanent else 'for this session.'}")
     elif args.command == "list-includes":
         collector.list_includes()
     elif args.command == "list-excludes":
         collector.list_excludes()
     else:
-        # If no command is provided, just run the collector
-        pass
+        command_executed = False
 
-    # Run with dry-run logic
+
     if args.dry_run:
         collector.dry_run()
-    else:
-        collector.run()
-        collector.reload_settings_from_permanent_config()
-        
+        # Nach einem Dry-Run wird nichts in die Zwischenablage kopiert
+        # und auch kein Dateiinhalt direkt geprintet, da die Datei nicht (final) geschrieben wurde.
+    elif not command_executed: # Kein Subkommando wurde ausgeführt, also ein normaler Run
+        # print(f"Performing run... (Follow symlinks: {args.follow_symlinks})")
+        try:
+            collector.run() # Führt generate_tree() und collect_files() aus
+            output_file_path = os.path.join(collector.root_dir, collector.output_file)
+            print(f"Run finished. Output written to {output_file_path}")
+
+            if args.to_clipboard:
+                # In die Zwischenablage kopieren
+                if os.path.exists(output_file_path):
+                    try:
+                        with open(output_file_path, 'r', encoding='utf-8') as f:
+                            content_to_copy = f.read()
+                        if content_to_copy:
+                            copy_to_clipboard(content_to_copy)
+                        else:
+                            print(f"Output file '{output_file_path}' is empty. Nothing to copy to clipboard.")
+                    except Exception as e:
+                        print(f"Error reading output file '{output_file_path}' for clipboard: {e}")
+                else:
+                    print(f"Output file '{output_file_path}' not found. Cannot copy to clipboard.")
+            else: # Nicht --to-clipboard
+                if os.path.exists(output_file_path):
+                    try:
+                        with open(output_file_path, 'r', encoding='utf-8') as f:
+                            file_content = f.read()
+                        if file_content:
+                            print("\n--- Content of " + output_file_path + " ---")
+                            
+                            # Bestimme das Encoding von stdout, mit Fallback auf ASCII
+                            stdout_encoding = sys.stdout.encoding if sys.stdout.encoding else 'ascii'
+                            
+                            # Versuche, den String für stdout zu kodieren und dabei Fehler zu ersetzen,
+                            # dann wieder zu dekodieren, um ihn an print() zu übergeben.
+                            # print() wird dann versuchen, diesen (potenziell modifizierten) String
+                            # erneut gemäß sys.stdout.encoding zu behandeln.
+                            # Diese Methode ist etwas umständlich, aber ein Weg, den Fehler abzufangen.
+                            try:
+                                print(file_content) # Erster Versuch
+                            except UnicodeEncodeError:
+                                print(f"Warning: Console encoding '{stdout_encoding}' cannot display all characters. Replacing unmappable characters.")
+                                # Kodieren mit Fehlerersetzung, dann für print wieder dekodieren
+                                # Dies stellt sicher, dass print einen String erhält, den es verarbeiten kann,
+                                # auch wenn das bedeutet, dass einige Zeichen durch '?' ersetzt wurden.
+                                printable_content = file_content.encode(stdout_encoding, errors='replace').decode(stdout_encoding)
+                                print(printable_content)
+                            print("--- End of Content ---")
+                        else:
+                            print(f"Output file '{output_file_path}' is empty. Nothing to display.")
+                    except Exception as e:
+                        print(f"Error reading or printing output file '{output_file_path}': {e}")
+                else:
+                    print(f"Output file '{output_file_path}' not found. Cannot display content.")
+        except Exception as e:
+            print(f"An error occurred during the run: {e}")
+
 if __name__ == "__main__":
     main()
-
-
-"""
-2gpt
-
-Lokale config wird ausgelesen falls sie exististiert 
-Falls lokale config nicht existiert. Globale config auslesen.
-Einen run starten mit determinierter config.
-
-
-2gpt include "file.py"
-
-Lokale config wird ausgelesen falls sie exististiert 
-Falls lokale config nicht existiert. Globale config auslesen.
-
-file.py wird nur für den direkt folgenden run included, config files bleiben unverändert.
-Einen run starten mit determinierter config.
-
-
-2gpt include "file.py" --permanent
-
-Lokale config wird ausgelesen falls sie exististiert 
-Falls lokale config nicht existiert. Globale config auslesen und als .gptignore in
-das jeweilig rootverzeichnis abspeichern.
-Dann die include "file.py" operation auf der configdatei durschführen, sodass "file.py" jetzt permanent und für
-erstmal alle zukünftigen runs included ist.
-
-2gpt include "file.py" --permanent --global-config
-
-Lokale config wird ignoriert
-Globale config auslesen.
-Dann die include "file.py" operation auf der globalen configdatei durchführen, sodass "file.py" jetzt permanent
-und für alle zukünftigen runs included ist, welche die globale config nutzen müssen.
-
-
-Einen run starten mit determinierter config.
-
-
-Globale config wird nur ausgelesen fall "--global-config" als parameter, dann egal ob lokale existiert
-
-Perm
-
-
-
----------------------
-
-
-To implement the desired behavior for the **CLI tool** with local and global configuration management for `include`, `exclude`, `list-includes`, `list-excludes`, and `remove` functionality, here’s how the CLI should behave for each command:
-
-### Overall Workflow for Local and Global Configurations:
-
-1. **Default Run (`2gpt`)**:
-    - **Local config is used** if it exists.
-    - **If local config does not exist**, the global config is used.
-    - Perform the run with the determined config (local or global).
-
-2. **Temporary Include (`2gpt include "file.py"`)**:
-    - **Local config is used** if it exists.
-    - **If local config does not exist**, the global config is used.
-    - Include the file `file.py` for this run temporarily (the config files remain unchanged).
-    - Start a run with the determined config and the temporary include.
-
-3. **Permanent Include Locally (`2gpt include "file.py" --permanent`)**:
-    - **Local config is used** if it exists.
-    - **If local config does not exist**, the global config is copied to a new local `.gptignore` file.
-    - Modify the local config to include `file.py` permanently.
-    - Start a run with the modified local config.
-
-4. **Permanent Include Globally (`2gpt include "file.py" --permanent --global-config`)**:
-    - **Local config is ignored**.
-    - **Global config is used**.
-    - Modify the global config to include `file.py` permanently.
-    - Start a run with the modified global config.
-
----
-
-### Adding `exclude`, `list-includes`, `list-excludes`, and `remove` Functionality:
-
-1. **Temporary Exclude (`2gpt exclude "file.py"`)**:
-    - **Local config is used** if it exists.
-    - **If local config does not exist**, the global config is used.
-    - Exclude the file `file.py` for this run temporarily (the config files remain unchanged).
-    - Start a run with the determined config and the temporary exclusion.
-
-2. **Permanent Exclude Locally (`2gpt exclude "file.py" --permanent`)**:
-    - **Local config is used** if it exists.
-    - **If local config does not exist**, the global config is copied to a new local `.gptignore` file.
-    - Modify the local config to exclude `file.py` permanently.
-    - Start a run with the modified local config.
-
-3. **Permanent Exclude Globally (`2gpt exclude "file.py" --permanent --global-config`)**:
-    - **Local config is ignored**.
-    - **Global config is used**.
-    - Modify the global config to exclude `file.py` permanently.
-    - Start a run with the modified global config.
-
-4. **List Includes (`2gpt list-includes`)**:
-    - **Local config is used** if it exists.
-    - **If local config does not exist**, the global config is used.
-    - List all files or patterns that are included in the config.
-
-5. **List Includes Globally (`2gpt list-includes --global-config`)**:
-    - **Local config is ignored**.
-    - **Global config is used**.
-    - List all files or patterns that are included in the global config.
-
-6. **List Excludes (`2gpt list-excludes`)**:
-    - **Local config is used** if it exists.
-    - **If local config does not exist**, the global config is used.
-    - List all files or patterns that are excluded in the config.
-
-7. **List Excludes Globally (`2gpt list-excludes --global-config`)**:
-    - **Local config is ignored**.
-    - **Global config is used**.
-    - List all files or patterns that are excluded in the global config.
-
-8. **Remove Include/Exclude Locally (`2gpt remove-include "file.py"` or `2gpt remove-exclude "file.py"`)**:
-    - **Local config is used** if it exists.
-    - **If local config does not exist**, the global config is used.
-    - Remove the specified file or pattern (`file.py`) from the inclusion/exclusion list.
-    - If the file is removed temporarily, the config remains unchanged.
-    - **If `--permanent` is specified**, the change is applied permanently to the local config.
-
-9. **Remove Include/Exclude Globally (`2gpt remove-include "file.py" --permanent --global-config` or `2gpt remove-exclude "file.py" --permanent --global-config`)**:
-    - **Local config is ignored**.
-    - **Global config is used**.
-    - Remove the specified file or pattern (`file.py`) from the inclusion/exclusion list in the global config permanently.
-
----
-
-### Command Breakdown:
-
-#### 1. **Default Run (`2gpt`)**:
-- **Local config** is used if it exists. If not, the **global config** is used.
-- Executes a run based on the configuration.
-
-#### 2. **Include**:
-- `2gpt include "file.py"`:
-    - Temporarily includes `file.py` for the next run without modifying the config files.
-
-- `2gpt include "file.py" --permanent`:
-    - Modifies the **local config** permanently to include `file.py`. If no local config exists, the global config is copied to the local `.gptignore`.
-
-- `2gpt include "file.py" --permanent --global-config`:
-    - Modifies the **global config** permanently to include `file.py`. The local config is ignored.
-
-#### 3. **Exclude**:
-- `2gpt exclude "file.py"`:
-    - Temporarily excludes `file.py` for the next run without modifying the config files.
-
-- `2gpt exclude "file.py" --permanent`:
-    - Modifies the **local config** permanently to exclude `file.py`. If no local config exists, the global config is copied to the local `.gptignore`.
-
-- `2gpt exclude "file.py" --permanent --global-config`:
-    - Modifies the **global config** permanently to exclude `file.py`. The local config is ignored.
-
-#### 4. **List Includes**:
-- `2gpt list-includes`:
-    - Lists all files or patterns included in the **local config** (if it exists) or the **global config**.
-
-- `2gpt list-includes --global-config`:
-    - Lists all files or patterns included in the **global config**.
-
-#### 5. **List Excludes**:
-- `2gpt list-excludes`:
-    - Lists all files or patterns excluded in the **local config** (if it exists) or the **global config**.
-
-- `2gpt list-excludes --global-config`:
-    - Lists all files or patterns excluded in the **global config**.
-
-#### 6. **Remove Include/Exclude**:
-- `2gpt remove-include "file.py"` or `2gpt remove-exclude "file.py"`:
-    - Removes `file.py` from the inclusion/exclusion list temporarily (no permanent config changes).
-
-- `2gpt remove-include "file.py" --permanent` or `2gpt remove-exclude "file.py" --permanent`:
-    - Permanently removes `file.py` from the **local config**.
-
-- `2gpt remove-include "file.py" --permanent --global-config` or `2gpt remove-exclude "file.py" --permanent --global-config`:
-    - Permanently removes `file.py` from the **global config**, ignoring the local config.
-
----
-
-### Example Workflows:
-
-1. **Run with Default Configuration**:
-    ```bash
-    2gpt
-    ```
-
-2. **Temporarily Include a File**:
-    ```bash
-    2gpt include "file.py"
-    ```
-
-3. **Permanently Include a File Locally**:
-    ```bash
-    2gpt include "file.py" --permanent
-    ```
-
-4. **Permanently Include a File Globally**:
-    ```bash
-    2gpt include "file.py" --permanent --global-config
-    ```
-
-5. **List Includes in Local Config**:
-    ```bash
-    2gpt list-includes
-    ```
-
-6. **List Includes in Global Config**:
-    ```bash
-    2gpt list-includes --global-config
-    ```
-
-7. **Remove a File from Local Exclude List Permanently**:
-    ```bash
-    2gpt remove-exclude "file.py" --permanent
-    ```
-
-8. **Remove a File from Global Include List Permanently**:
-    ```bash
-    2gpt remove-include "file.py" --permanent --global-config
-    ```
-
----
-
-This description covers the complete behavior for `include`, `exclude`, `list-includes`, `list-excludes`, and `remove` operations with local and global configurations, using the `--permanent` and `--global-config` flags where appropriate.
-
-"""
