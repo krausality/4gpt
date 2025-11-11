@@ -241,13 +241,23 @@ class FileCollector:
                 compiled.append(f"^{regex_body}$")
         return compiled
 
+    def _format_size(self, size_bytes):
+        """Convert bytes to human-readable format."""
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size_bytes < 1024.0:
+                return f"{size_bytes:.1f} {unit}"
+            size_bytes /= 1024.0
+        return f"{size_bytes:.1f} TB"
+
     def _append_file_content(self, output_file_obj, file_path):
         try:
             if os.path.isdir(file_path): 
                 return
+            file_size = os.path.getsize(file_path)
+            size_str = self._format_size(file_size)
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f_content:
                 content = f_content.read()
-            output_file_obj.write(f"----- START OF {os.path.normpath(file_path)} -----\n")
+            output_file_obj.write(f"----- START OF {os.path.normpath(file_path)} ({size_str}) -----\n")
             output_file_obj.write(content)
             output_file_obj.write(f"\n----- END OF {os.path.normpath(file_path)} -----\n\n\n")
         except Exception as e:

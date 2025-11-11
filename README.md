@@ -7,8 +7,9 @@ Included and excluded files can be controlled dynamically or permanently via `.g
 
 - 🗂️ Generates a file structure overview as a tree + JSON
 - 📂 **Whitelist-based filtering:** only files matching `include_patterns` are collected (see [How File Filtering Works](#-how-file-filtering-works))
+- 📏 **File size display:** shows human-readable file sizes (B, KB, MB, GB) for each collected file
 - 🧠 Local and global configuration management (`--global-config`)
-- ✅ Temporary or permanent changes with `--permanent`
+- ✅ Temporary or permanent changes with `--permanent`)
 - 🔍 Dry-run mode to preview filtering before execution
 
 ## ⚡ Quick Install (Recommended)
@@ -190,9 +191,24 @@ project
 ├── main.py
 ├── utils/
 │   └── helper.py
+
+----- START OF main.py (2.3 KB) -----
+import argparse
+...
+----- END OF main.py -----
+
+
+----- START OF utils\helper.py (856.0 B) -----
+def helper_function():
+    pass
+----- END OF utils\helper.py -----
 ```
 
-After that, all contents (filtered by include/exclude rules) are appended to `allfiles.txt`.
+The generated `allfiles.txt` contains:
+1. **File tree structure** showing all files (filtered by `exclude_patterns`)
+2. **Concatenated file contents** with headers showing the file path and size in human-readable format (KB, MB, etc.)
+
+All file contents are filtered by both `include_patterns` and `exclude_patterns`.
 
 ## 🎯 How File Filtering Works
 
@@ -213,6 +229,10 @@ The generated `allfiles.txt` consists of **two distinct sections**:
 - Filtered by **BOTH** `include_patterns` AND `exclude_patterns`
 - Uses a **whitelist approach**: only files matching at least one `include_pattern` are included
 - Files must **match an include pattern** AND **not match any exclude pattern**
+- Each file is prefixed with a header showing its **path and size** in human-readable format:
+  ```
+  ----- START OF path/to/file.py (12.3 KB) -----
+  ```
 
 ### The Whitelist Principle
 
