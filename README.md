@@ -6,9 +6,10 @@ Included and excluded files can be controlled dynamically or permanently via `.g
 ## 🔧 Features
 
 - 🗂️ Generates a file structure overview as a tree + JSON
-- 📂 Inclusion/exclusion via patterns (e.g. `*.py`, `*.png`)
+- 📂 **Whitelist-based filtering:** only files matching `include_patterns` are collected (see [How File Filtering Works](#-how-file-filtering-works))
 - 🧠 Local and global configuration management (`--global-config`)
 - ✅ Temporary or permanent changes with `--permanent`
+- 🔍 Dry-run mode to preview filtering before execution
 
 ## ⚡ Quick Install (Recommended)
 
@@ -192,6 +193,128 @@ project
 ```
 
 After that, all contents (filtered by include/exclude rules) are appended to `allfiles.txt`.
+
+## 🎯 How File Filtering Works
+
+Understanding the **whitelist-based filtering mechanism** is crucial to using `4gpt` effectively.
+
+### Two-Stage Output Structure
+
+The generated `allfiles.txt` consists of **two distinct sections**:
+
+#### 1. **File Tree** (Visual Structure)
+- Shows **all files and directories** in your project
+- Filtered **only** by `exclude_patterns`
+- Provides a complete structural overview
+- **Does NOT** consider `include_patterns`
+
+#### 2. **File Contents** (Concatenated Code)
+- Contains the **actual content** of files
+- Filtered by **BOTH** `include_patterns` AND `exclude_patterns`
+- Uses a **whitelist approach**: only files matching at least one `include_pattern` are included
+- Files must **match an include pattern** AND **not match any exclude pattern**
+
+### The Whitelist Principle
+
+**Critical:** A file will **NEVER** appear in the content section unless it matches at least one pattern in `include_patterns`.
+
+```python
+# Simplified filtering logic from core.py
+included = any(pattern matches file for pattern in include_patterns)
+excluded = any(pattern matches file for pattern in exclude_patterns)
+
+if included and not excluded:
+    # ✅ File content is appended to allfiles.txt
+else:
+    # ❌ File is skipped (may still appear in tree)
+```
+
+### Example Scenario
+
+Given this configuration:
+
+```json
+{
+  "include_patterns": ["*.py", "*.md"],
+  "exclude_patterns": ["*.png", "test_*"]
+}
+```
+
+**File tree will show:**
+- ✅ `main.py`
+- ✅ `README.md`
+- ✅ `config.json` (shown in tree, not in content!)
+- ✅ `test_utils.py` (shown in tree, not in content!)
+- ❌ `logo.png` (excluded from tree AND content)
+
+**File contents will include:**
+- ✅ `main.py` (matches `*.py`, not excluded)
+- ✅ `README.md` (matches `*.md`, not excluded)
+- ❌ `config.json` (no include match - even though not explicitly excluded!)
+- ❌ `test_utils.py` (matches `*.py` but excluded by `test_*`)
+- ❌ `logo.png` (explicitly excluded)
+
+### Default Behavior
+
+The global `config.json` comes with a comprehensive whitelist of common code file types:
+
+```json
+"include_patterns": [
+    "*.py", "*.js", "*.ts", "*.tsx", "*.java", "*.cpp", "*.c", 
+    "*.md", "*.json", "*.yaml", "*.yml", "*.sh", "*.sql",
+    "Dockerfile", /* ... and more */
+]
+```
+
+**This means:**
+- Binary files (`.exe`, `.dll`, `.so`) are automatically excluded
+- Media files (`.jpg`, `.gif`, `.mp4`) are automatically excluded  
+- Archive files (`.zip`, `.tar`, `.gz`) are automatically excluded
+- **Any file type not listed** is excluded from content collection
+
+### Why This Design?
+
+1. **🔒 Security:** Prevents accidental inclusion of credentials, API keys, or sensitive data often stored in non-code files
+2. **⚡ Performance:** Avoids processing large binary files or archives
+3. **🎯 Relevance:** Focuses output on human-readable source code and documentation
+4. **🛡️ Safety:** Reduces risk of encoding errors from binary data
+
+### Customizing the Whitelist
+
+To include additional file types:
+
+```bash
+# Temporarily for one run
+4gpt include "*.toml"
+
+# Permanently in local config
+4gpt include "*.config" --permanent
+
+# Permanently in global config
+4gpt include "*.env" --permanent --global-config
+```
+
+To see what's currently included:
+
+```bash
+4gpt list-includes
+4gpt list-includes --global-config  # for global config
+```
+
+### Troubleshooting
+
+**Problem:** "My file appears in the tree but not in the content section"
+
+**Solution:** The file doesn't match any `include_pattern`. Either:
+1. Add the file extension to includes: `4gpt include "*.yourext" --permanent`
+2. Use dry-run to verify: `4gpt --dry-run` (will show `"(no include match)"`)
+
+**Problem:** "I want ALL files included"
+
+**Solution:** Add a catch-all pattern (use with caution):
+```bash
+4gpt include "*" --permanent
+```
 
 ## 📄 License
 
