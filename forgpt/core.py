@@ -214,11 +214,25 @@ class FileCollector:
                     ]
                     
                     for file_name in files:
-                        included = any(re.fullmatch(pattern_re, file_name) for pattern_re in compiled_include_patterns)
-                        excluded = any(re.fullmatch(pattern_re, file_name) for pattern_re in compiled_exclude_patterns)
+                        file_path = os.path.join(root, file_name)
+                        
+                        # Calculate relative path for path-based pattern matching
+                        relative_path = os.path.relpath(file_path, self.root_dir)
+                        # Normalize to forward slashes (cross-platform compatibility)
+                        relative_path = relative_path.replace(os.sep, '/')
+                        
+                        # Match against BOTH filename and relative path
+                        # This enables both "*.v" (filename) and "spartan6/ddr3.v" (path) patterns
+                        included = any(
+                            re.fullmatch(pattern_re, file_name) or re.fullmatch(pattern_re, relative_path)
+                            for pattern_re in compiled_include_patterns
+                        )
+                        excluded = any(
+                            re.fullmatch(pattern_re, file_name) or re.fullmatch(pattern_re, relative_path)
+                            for pattern_re in compiled_exclude_patterns
+                        )
                         
                         if included and not excluded:
-                            file_path = os.path.join(root, file_name)
                             self._append_file_content(f_out, file_path)
         except IOError as e:
             print(f"Error appending to output file {self.output_file}: {e}")

@@ -350,6 +350,622 @@ To include additional file types:
 4gpt include "*.env" --permanent --global-config
 ```
 
+---
+
+## 📋 Pattern Syntax Guide
+
+Understanding how to write effective patterns is crucial for precise file filtering. `4gpt` supports both **filename-based** and **path-based** patterns.
+
+### Pattern Matching Behavior
+
+**Patterns are matched against BOTH:**
+1. **Filename only:** `"test.py"`
+2. **Relative path:** `"src/tests/test.py"` (from project root)
+
+This dual-matching enables flexible filtering strategies.
+
+### Basic Pattern Syntax
+
+| Pattern | Description | Matches | Doesn't Match |
+|---------|-------------|---------|---------------|
+| `*.py` | Files ending with `.py` | `main.py`, `src/app.py` | `main.pyx`, `test.js` |
+| `test_*` | Files starting with `test_` | `test_utils.py`, `test_main.js` | `utils_test.py`, `my_test.py` |
+| `*test*` | Files containing `test` | `test.py`, `mytest.js`, `pytest.ini` | `main.py` |
+| `*.{py,js}` | ❌ **NOT supported** | Use multiple patterns instead | N/A |
+
+### Path-Based Patterns
+
+**New in v0.2:** Path-based patterns allow precise directory-level control.
+
+| Pattern | Description | Matches | Doesn't Match |
+|---------|-------------|---------|---------------|
+| `src/main.py` | Specific file in path | `src/main.py` | `main.py`, `lib/main.py` |
+| `tests/*` | All files in `tests/` | `tests/test1.py`, `tests/data.json` | `tests/unit/test.py` |
+| `build/*` | All files in `build/` | `build/output.js` | `src/build/file.js` |
+| `*/temp_*` | Files starting with `temp_` in any direct subdirectory | `src/temp_file.py`, `lib/temp_data.json` | `temp_file.py` (root), `src/sub/temp.py` |
+
+**Important:** Paths always use **forward slashes** `/` (even on Windows).
+
+---
+
+## ✅ Do's and ❌ Don'ts
+
+### ✅ **DO: Use Filename Patterns for Common Files**
+
+**Good:**
+```json
+{
+  "include_patterns": ["*.py", "*.js", "*.md"],
+  "exclude_patterns": ["test_*", "*_backup*", "*.tmp"]
+}
+```
+
+**Why:** Simple, clear, and works across all directories.
+
+---
+
+### ❌ **DON'T: Use Path Patterns When Filename Suffices**
+
+**Bad:**
+```json
+{
+  "exclude_patterns": [
+    "src/test_main.py",
+    "lib/test_utils.py",
+    "app/test_config.py"
+  ]
+}
+```
+
+**Good:**
+```json
+{
+  "exclude_patterns": ["test_*"]
+}
+```
+
+**Why:** Filename pattern `test_*` excludes all test files everywhere. Less verbose, more maintainable.
+
+---
+
+### ✅ **DO: Use Path Patterns for Directory-Specific Exclusions**
+
+**Good:**
+```json
+{
+  "exclude_patterns": [
+    "vendor/*",
+    "node_modules/*",
+    "build/*",
+    "dist/*"
+  ]
+}
+```
+
+**Why:** These directories contain generated/third-party code you don't want to analyze.
+
+---
+
+### ❌ **DON'T: Forget the Wildcard in Directory Patterns**
+
+**Bad:**
+```json
+{
+  "exclude_patterns": ["build"]  // ⚠️ Excludes the directory, but NOT recursively!
+}
+```
+
+**Good:**
+```json
+{
+  "exclude_patterns": ["build/*"]  // ✅ Excludes all files IN build/ (recursively)
+}
+```
+
+**Best (Recommended):**
+```json
+{
+  "exclude_patterns": ["build", "build/*"]  // ✅✅ Prevents traversal AND excludes files
+}
+```
+
+**Why:** 
+- `"build"` prevents os.walk from entering the directory (faster, saves processing)
+- `"build/*"` ensures files inside are excluded if the directory IS traversed
+- Using **both** is most robust (defense in depth)
+
+**Technical Detail:**
+- Directory filtering uses `fnmatch.fnmatch(dirname, pattern)` → `"build"` matches
+- File filtering uses regex against relative path → `"build/*"` matches `"build/file.js"`
+
+---
+
+### ✅ **DO: Combine Filename and Path Patterns**
+
+**Good:**
+```json
+{
+  "include_patterns": ["*.py", "*.js"],
+  "exclude_patterns": [
+    "test_*",           // Exclude all test files (filename)
+    "vendor/*",         // Exclude vendor directory (path)
+    "*/migrations/*",   // Exclude migrations in any directory (path)
+    "__pycache__/*"     // Exclude Python cache (path)
+  ]
+}
+```
+
+**Why:** Leverages both pattern types for maximum precision.
+
+---
+
+### ❌ **DON'T: Use Recursive Wildcards (Not Supported)**
+
+**Bad:**
+```json
+{
+  "exclude_patterns": ["**/test/**"]  // ❌ ** is NOT supported
+}
+```
+
+**Good:**
+```json
+{
+  "exclude_patterns": ["*/test/*"]  // ✅ Matches test/ in immediate subdirectories
+}
+```
+
+**Why:** Double-star `**` glob syntax is not supported. Use single `*` for wildcards.
+
+---
+
+### ✅ **DO: Use Wildcards for Flexibility**
+
+**Good:**
+```json
+{
+  "exclude_patterns": [
+    "*generated*",      // Matches any file with "generated" in name
+    "*.min.js",         // Matches minified JavaScript
+    "*.bundle.*"        // Matches bundled files
+  ]
+}
+```
+
+**Why:** Wildcards adapt to naming conventions without listing every variant.
+
+---
+
+### ❌ **DON'T: Over-Specify Paths**
+
+**Bad:**
+```json
+{
+  "exclude_patterns": [
+    "src/components/legacy/old_button.jsx",
+    "src/components/legacy/old_input.jsx",
+    "src/components/legacy/old_form.jsx"
+  ]
+}
+```
+
+**Good:**
+```json
+{
+  "exclude_patterns": ["src/components/legacy/*"]
+}
+```
+
+**Why:** Directory pattern is more maintainable and catches future files too.
+
+---
+
+## 🎯 Common Use Cases
+
+### Use Case 1: Python Project
+
+**Goal:** Include Python source, exclude tests and generated files.
+
+```json
+{
+  "include_patterns": [
+    "*.py",
+    "*.pyx",
+    "requirements.txt",
+    "pyproject.toml"
+  ],
+  "exclude_patterns": [
+    "test_*",
+    "*_test.py",
+    "tests", "tests/*",
+    "__pycache__", "__pycache__/*",
+    "*.pyc",
+    ".pytest_cache", ".pytest_cache/*",
+    "build", "build/*",
+    "dist", "dist/*",
+    "*.egg-info", "*.egg-info/*"
+  ]
+}
+```
+
+**Explanation:**
+- ✅ Include all Python source files and config
+- ❌ Exclude test files (multiple naming patterns)
+- ❌ Exclude build artifacts and caches
+
+---
+
+### Use Case 2: JavaScript/TypeScript Project
+
+**Goal:** Include source code, exclude dependencies and build outputs.
+
+```json
+{
+  "include_patterns": [
+    "*.js",
+    "*.ts",
+    "*.tsx",
+    "*.jsx",
+    "package.json",
+    "tsconfig.json"
+  ],
+  "exclude_patterns": [
+    "node_modules", "node_modules/*",
+    "build", "build/*",
+    "dist", "dist/*",
+    "coverage", "coverage/*",
+    "*.min.js",
+    "*.bundle.js",
+    ".next", ".next/*",
+    ".nuxt", ".nuxt/*"
+  ]
+}
+```
+
+**Explanation:**
+- ✅ Include JavaScript/TypeScript source and config
+- ❌ Exclude massive `node_modules/` directory
+- ❌ Exclude build outputs and minified files
+
+---
+
+### Use Case 3: Hardware/Verilog Project
+
+**Goal:** Include HDL source, exclude IP cores and build artifacts.
+
+```json
+{
+  "include_patterns": [
+    "*.v",
+    "*.vh",
+    "*.sv",
+    "*.mem",
+    "*.ucf",
+    "*.xdc"
+  ],
+  "exclude_patterns": [
+    "*/ipcore_dir/*",
+    "*/coregen/*",
+    "*/par/*",
+    "*_sim/*",
+    "tb_*",
+    "*_testbench.v",
+    "*.bit",
+    "*.mcs"
+  ]
+}
+```
+
+**Explanation:**
+- ✅ Include Verilog/SystemVerilog HDL and constraints
+- ❌ Exclude generated IP cores (vendor-specific)
+- ❌ Exclude testbenches and simulation files
+- ❌ Exclude bitstream files
+
+---
+
+### Use Case 4: Documentation Project
+
+**Goal:** Include docs and config, exclude build outputs.
+
+```json
+{
+  "include_patterns": [
+    "*.md",
+    "*.rst",
+    "*.txt",
+    "*.adoc",
+    "mkdocs.yml",
+    "conf.py"
+  ],
+  "exclude_patterns": [
+    "_build", "_build/*",
+    "site", "site/*",
+    ".doctrees", ".doctrees/*",
+    "*.pyc"
+  ]
+}
+```
+
+**Explanation:**
+- ✅ Include documentation source files
+- ✅ Include doc builder configs
+- ❌ Exclude generated HTML/PDF outputs
+
+---
+
+### Use Case 5: Multi-Language Monorepo
+
+**Goal:** Include specific service directories, exclude shared build artifacts.
+
+```json
+{
+  "include_patterns": [
+    "*.py",
+    "*.js",
+    "*.go",
+    "*.rs",
+    "*.md"
+  ],
+  "exclude_patterns": [
+    "*/node_modules/*",
+    "*/__pycache__/*",
+    "*/target/*",
+    "*/build/*",
+    "*/dist/*",
+    "*/vendor/*",
+    "test_*",
+    "*_test.*"
+  ]
+}
+```
+
+**Explanation:**
+- ✅ Include multiple language sources
+- ❌ Exclude language-specific dependency folders
+- ❌ Use wildcards to catch patterns across all languages
+
+---
+
+### Use Case 6: Legacy Codebase with Specific Exclusions
+
+**Goal:** Exclude specific problematic files/directories by path.
+
+```json
+{
+  "include_patterns": ["*.c", "*.h", "*.cpp"],
+  "exclude_patterns": [
+    "legacy/old_protocol/*",
+    "vendor/third_party/*",
+    "*/autogenerated/*",
+    "parser_generated.c",
+    "lexer_generated.h"
+  ]
+}
+```
+
+**Explanation:**
+- ✅ Include C/C++ source
+- ❌ Exclude specific legacy subsystems by path
+- ❌ Exclude specific generated files by name
+
+---
+
+## 🔍 Pattern Debugging Tips
+
+### Test Your Patterns with Dry Run
+
+```bash
+4gpt --dry-run
+```
+
+**Shows:**
+- ✅ Which files would be included
+- ❌ Which files would be excluded
+- 📋 Current patterns active
+
+**Use this to verify your patterns work as expected before generating `allfiles.txt`.**
+
+---
+
+### Common Pattern Mistakes
+
+#### Mistake 1: Path vs. Filename Confusion
+
+**Problem:**
+```json
+"exclude_patterns": ["src/test.py"]  // Expecting to exclude ALL test.py files
+```
+
+**What happens:** Only `src/test.py` is excluded, not `lib/test.py` or `app/test.py`.
+
+**Fix:**
+```json
+"exclude_patterns": ["test.py"]  // Excludes test.py in ANY directory
+```
+
+---
+
+#### Mistake 2: Missing Wildcard in Directory Pattern
+
+**Problem:**
+```json
+"exclude_patterns": ["build"]  // Expecting to exclude build/ directory
+```
+
+**What happens:** Only matches if a **file** is named exactly "build".
+
+**Fix:**
+```json
+"exclude_patterns": ["build/*"]  // Excludes files IN build/
+```
+
+---
+
+#### Mistake 3: Over-Specific Patterns
+
+**Problem:**
+```json
+"exclude_patterns": [
+  "test_utils.py",
+  "test_helpers.py",
+  "test_fixtures.py"
+  // ... 50 more test files
+]
+```
+
+**What happens:** Config becomes unmaintainable. New test files are not excluded.
+
+**Fix:**
+```json
+"exclude_patterns": ["test_*"]  // Covers all current and future test files
+```
+
+---
+
+## 🎓 Advanced Pattern Techniques
+
+### Technique 1: Exclude Generated Files by Naming Convention
+
+**Pattern:**
+```json
+{
+  "exclude_patterns": [
+    "*generated*",
+    "*_gen.c",
+    "*.auto.*"
+  ]
+}
+```
+
+**Use When:** Your build system uses consistent naming for generated files.
+
+---
+
+### Technique 2: Directory-Specific File Type Exclusion
+
+**Pattern:**
+```json
+{
+  "include_patterns": ["*.js"],
+  "exclude_patterns": [
+    "examples/*.js",  // Exclude JS in examples/ only
+    "docs/*.js"       // Exclude JS in docs/ only
+  ]
+}
+```
+
+**Use When:** You want to include `.js` files but skip examples/documentation.
+
+---
+
+### Technique 3: Multi-Level Directory Exclusion
+
+**Pattern:**
+```json
+{
+  "exclude_patterns": [
+    "*/cache/*",      // Exclude cache/ in any immediate subdir
+    "*/temp/*",
+    "*/.git/*"
+  ]
+}
+```
+
+**Use When:** Standard directories appear at multiple levels in your project.
+
+---
+
+### Technique 4: Exact File Exclusion in Specific Path
+
+**Pattern:**
+```json
+{
+  "exclude_patterns": [
+    "src/legacy/config.json",  // Exact file in exact path
+    "lib/generated/constants.py"
+  ]
+}
+```
+
+**Use When:** You need surgical precision to exclude specific problem files.
+
+---
+
+## 📊 Pattern Performance Tips
+
+### Tip 1: Filename Patterns are Faster
+
+**Faster:**
+```json
+"exclude_patterns": ["*.tmp"]
+```
+
+**Slower:**
+```json
+"exclude_patterns": ["*/cache/*.tmp"]
+```
+
+**Why:** Filename-only matching can short-circuit on first match. Use path patterns only when necessary.
+
+---
+
+### Tip 2: Exclude Directories to Prevent Traversal
+
+**Best Practice:**
+```json
+{
+  "exclude_patterns": [
+    "node_modules",      // ← Prevents os.walk from entering directory
+    "node_modules/*",    // ← Ensures files are excluded if traversed
+    "vendor",
+    "vendor/*"
+  ]
+}
+```
+
+**Why:** 
+- Directory name pattern (e.g., `"node_modules"`) stops directory traversal early
+- Path pattern (e.g., `"node_modules/*"`) catches files if directory IS entered
+- **Combining both is fastest and most reliable**
+- Prevents processing thousands of unnecessary files
+
+---
+
+### Tip 3: Order Patterns by Frequency
+
+**Better:**
+```json
+{
+  "exclude_patterns": [
+    "*.pyc",          // Most common (thousands of files)
+    "__pycache__/*",  // Very common
+    "test_*",         // Common
+    "legacy/old.py"   // Rare (specific file)
+  ]
+}
+```
+
+**Why:** Patterns are evaluated in order. Putting common patterns first enables earlier short-circuits.
+
+---
+
+## 🎯 Summary: Pattern Best Practices
+
+1. ✅ **Start simple:** Use filename patterns like `*.py`, `test_*`
+2. ✅ **Add paths only when needed:** Use `src/generated/*` for directory-specific exclusions
+3. ✅ **Test with `--dry-run`:** Verify patterns before generating output
+4. ✅ **Use wildcards wisely:** `*generated*` is flexible, `gen_*_v2.c` is too specific
+5. ✅ **Exclude directories early:** `node_modules/*`, `vendor/*` save processing time
+6. ❌ **Avoid over-specification:** Prefer `test_*` over listing every test file
+7. ❌ **Don't forget `/*` for directories:** `build/*` not `build`
+8. ❌ **Don't use `**` (not supported):** Use single `*` instead
+
+---
+
+## 🕵️ Dry Run Mode
+```
+
 To see what's currently included:
 
 ```bash
