@@ -187,7 +187,8 @@ class FileCollector:
             root_dir=self.root_dir,
             exclude_dirs=set(), 
             exclude_files=self.exclude_patterns, 
-            follow_symlinks_in_tree=self.follow_symlinks
+            follow_symlinks_in_tree=self.follow_symlinks,
+            show_file_sizes=True
         )
         try:
             with open(self.output_file, 'w', encoding='utf-8') as f:

@@ -28,7 +28,17 @@ pip install "git+https://github.com/krausality/4gpt.git@<commit-hash>"
 
 **Note**: This method requires an internet connection and Git to be available in your environment.
 
-## 🖥️ Installation
+## � Dependencies
+
+`4gpt` depends on the following external packages:
+
+- **[dir_tree](https://github.com/krausality/dir_tree)** (v0.2.0+): Generates the directory tree structure with file sizes
+  - Automatically installed from GitHub when you install 4gpt
+  - Provides the file tree visualization and file size display features
+
+**Note:** Dependencies are automatically installed when using any of the installation methods above.
+
+## �🖥️ Installation
 
 ```bash
 git clone https://github.com/krausality/4gpt.git
@@ -44,19 +54,45 @@ python -m build --wheel
 pip install dist/4gpt-*.whl
 ```
 
+## 🔄 Updating
 
-## 🛠  Development Mode (Editable Installs)
+To update `4gpt` to the latest version:
+
+**From GitHub (Quick Install users):**
+```bash
+pip install --upgrade "git+https://github.com/krausality/4gpt.git"
+```
+
+**From local clone:**
+```bash
+cd 4gpt
+git pull
+pip install --upgrade -r requirements.txt
+pip install --upgrade .
+```
+
+**Editable install (Development Mode):**
+```bash
+cd 4gpt
+git pull
+# Dependencies are automatically updated
+```
+
+**Note:** Updates will also pull the latest compatible version of `dir_tree` as specified in `requirements.txt`.
+
+
+## 🛠  Development Mode (Editable Installs)
 
 If you plan to **develop or modify this project locally**, it's recommended to use an **editable install**. This allows Python to load the package **directly from your source directory**, so any code changes are reflected immediately — no need to reinstall after every edit.
 
 ### Setup
 
 ```bash
-cd dir_tree
+cd 4gpt
 python -m venv .venv
-source .venv/bin/activate      # or .venv\Scripts\activate on Windows
+source .venv/bin/activate      # or .venv\Scripts\activate on Windows
 pip install --editable .
-````
+```
 
 Once installed, you can run the tool in either of the following ways:
 
@@ -186,11 +222,11 @@ Additionally, ensure your console is using a font that supports a wide range of 
 
 ```txt
 File Structure:
-project
-├── .gptignore
-├── main.py
-├── utils/
-│   └── helper.py
+project/
+├── .gptignore (234.0 B)
+├── main.py (2.3 KB)
+└── utils/
+    └── helper.py (856.0 B)
 
 ----- START OF main.py (2.3 KB) -----
 import argparse
@@ -205,7 +241,7 @@ def helper_function():
 ```
 
 The generated `allfiles.txt` contains:
-1. **File tree structure** showing all files (filtered by `exclude_patterns`)
+1. **File tree structure** showing all files with their sizes (filtered by `exclude_patterns`)
 2. **Concatenated file contents** with headers showing the file path and size in human-readable format (KB, MB, etc.)
 
 All file contents are filtered by both `include_patterns` and `exclude_patterns`.

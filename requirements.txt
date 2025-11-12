@@ -4,4 +4,4 @@ setuptools
 wheel
 
 # External dependency (your own)
-git+https://github.com/krausality/dir_tree.git
+git+https://github.com/krausality/dir_tree.git@v0.2.0

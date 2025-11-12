@@ -12,7 +12,7 @@ setup(
         'forgpt': ['config.json'],  # Specify that config.json is included in the twogpt package
     },
     install_requires=[
-        'dir-tree @ git+https://github.com/krausality/dir_tree.git',
+        'dir-tree @ git+https://github.com/krausality/dir_tree.git@v0.2.0',
     ],
     entry_points={
         'console_scripts': [
